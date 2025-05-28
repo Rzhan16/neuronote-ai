@@ -38,6 +38,19 @@ content TEXT
 summary TEXT
 created_at TIMESTAMPTZ DEFAULT now()
 updated_at TIMESTAMPTZ DEFAULT now()
+
+-- quiz_cards
+id UUID PK
+note_id UUID FK(notes.id)
+question TEXT
+answer TEXT
+created_at TIMESTAMPTZ DEFAULT now()
+
+-- tags
+id UUID PK
+note_id UUID FK(notes.id)
+tag TEXT
+created_at TIMESTAMPTZ DEFAULT now()
 ```
 
 ## API Endpoints (v0)
@@ -61,13 +74,25 @@ updated_at TIMESTAMPTZ DEFAULT now()
     - Local: FP32 precision (CPU)
   - Supports paragraph and bullet-point formats
   - Caches results in Redis for 1 hour
+- `POST /generate-qa` - Generate questions from text
+  - Input: `{"text": string, "max_questions": int}`
+  - Response: `{"qa_pairs": [{"q": string, "a": string}]}`
+  - Uses T5-base model for question generation
+  - Generates up to max_questions (default: 5) QA pairs
+  - Caches results in Redis for 1 hour
 - `POST /pipeline` - Process file through ML pipeline
   - Input: `multipart/form-data` with file
   - Response: `{"note_id": string}`
+  - Detects file type (image/audio)
+  - Extracts text via OCR/ASR
+  - Generates summary
+  - Extracts keyphrases using KeyBERT
+  - Generates quiz cards
+  - Persists all data in PostgreSQL
 
 ## Milestone Log
 
-### M1: Initial Scaffold (2024-03-19)
+### M1: Initial Scaffold (2024-03-19) ✅
 - ✅ Created monorepo structure with frontend/, gateway/, ml/, infra/, docs/
 - ✅ Set up React + Vite + TypeScript in frontend/
 - ✅ Added Python FastAPI dependencies in ml/
@@ -75,7 +100,7 @@ updated_at TIMESTAMPTZ DEFAULT now()
 - ✅ Added polyglot .gitignore
 - ✅ Created initial documentation
 
-### M1.1: Docker Setup (2024-03-19)
+### M1.1: Docker Setup (2024-03-19) ✅
 - ✅ Created Docker Compose configuration with five services:
   - Frontend (Node.js): Port 5173
   - Gateway (Go): Port 8080 with healthcheck
@@ -86,33 +111,22 @@ updated_at TIMESTAMPTZ DEFAULT now()
 - ✅ Added health endpoints for gateway and ML services
 - ✅ Configured development environment with hot-reload
 
-### M2: FastAPI Base Implementation (2024-03-19)
+### M2: ML Service Implementation (2024-03-19) ✅
 - ✅ Created FastAPI app with health check
 - ✅ Added CORS middleware
 - ✅ Defined Pydantic models for responses
 - ✅ Set up endpoint stubs for OCR, ASR, and pipeline
-
-### M2.1: OCR Implementation (2024-03-19)
 - ✅ Implemented Tesseract OCR with layout analysis
 - ✅ Added OCR block extraction and confidence scoring
-- ✅ Created test infrastructure with sample image generation
-- ✅ Added ocr_blocks table to DB schema
-
-### M2.2: ASR Implementation (2024-03-19)
 - ✅ Implemented Whisper-small model for transcription
 - ✅ Added Redis caching with SHA256 hashing
-- ✅ Created test infrastructure with sample audio generation
-- ✅ Added audio_notes table to DB schema
-- ✅ Added proper error handling for invalid audio files
-
-### M2.3: Summarization Implementation (2024-03-19)
-- ✅ Implemented BART-large-CNN model
-  - Docker: 4-bit quantization (GPU)
-  - Local: FP32 precision (CPU)
-- ✅ Added support for paragraph and bullet-point formats
-- ✅ Created test infrastructure with sample text
-- ✅ Added summary column to notes table
-- ✅ Added Redis caching with style-specific keys
+- ✅ Implemented BART-large-CNN for summarization
+- ✅ Added T5-base for question generation
+- ✅ Added KeyBERT for keyphrase extraction
+- ✅ Created unified pipeline with PostgreSQL persistence
+- ✅ Added comprehensive test suite for all components
+- ✅ Added proper error handling and validation
+- ✅ Updated database schema with all required tables
 
 ### Development Environment (2024-03-19)
 - ✅ Go 1.24.3

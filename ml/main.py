@@ -8,6 +8,8 @@ import numpy as np
 from .ocr_service import extract_layout
 from .asr_service import transcribe
 from .summarise_service import summarise
+from .qg_service import generate_qa
+from .pipeline import process_note
 
 app = FastAPI()
 
@@ -38,6 +40,17 @@ class SummaryRequest(BaseModel):
 
 class SummaryResponse(BaseModel):
     summary: str
+
+class QARequest(BaseModel):
+    text: str
+    max_questions: int = 5
+
+class QAPair(BaseModel):
+    q: str
+    a: str
+
+class QAResponse(BaseModel):
+    qa_pairs: List[QAPair]
 
 class PipelineResponse(BaseModel):
     note_id: str
@@ -81,8 +94,19 @@ async def summarize_endpoint(request: SummaryRequest) -> SummaryResponse:
     result = summarise(request.text, request.style)
     return SummaryResponse(summary=result["summary"])
 
+# Question Generation Endpoint
+@app.post("/generate-qa", response_model=QAResponse)
+async def generate_qa_endpoint(request: QARequest) -> QAResponse:
+    qa_pairs = generate_qa(request.text, request.max_questions)
+    return QAResponse(qa_pairs=qa_pairs)
+
 # Pipeline Endpoint
 @app.post("/pipeline", response_model=PipelineResponse)
 async def pipeline_endpoint(file: UploadFile = File(...)) -> PipelineResponse:
-    # TODO: Implement pipeline logic
-    return PipelineResponse(note_id="sample-note-id")
+    try:
+        result = await process_note(file)
+        return PipelineResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
