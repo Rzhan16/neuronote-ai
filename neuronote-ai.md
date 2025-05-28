@@ -18,6 +18,21 @@ hashed_password TEXT
 created_at TIMESTAMPTZ
 ```
 
+## API Endpoints (v0)
+
+### ML Service (Port 8000)
+- `GET /health` - Health check endpoint
+  - Response: `{"ok": true}`
+- `POST /ocr` - Extract text from images
+  - Input: `multipart/form-data` with file
+  - Response: `{"blocks": [{"text": string, "confidence": float, "bbox": [float]}]}`
+- `POST /asr` - Convert speech to text
+  - Input: `multipart/form-data` with file
+  - Response: `{"transcript": string}`
+- `POST /pipeline` - Process file through ML pipeline
+  - Input: `multipart/form-data` with file
+  - Response: `{"note_id": string}`
+
 ## Milestone Log
 
 ### M1: Initial Scaffold (2024-03-19)
