@@ -23,6 +23,12 @@ note_id UUID FK(notes.id)
 text TEXT
 bbox JSONB  -- [x1, y1, x2, y2]
 created_at TIMESTAMPTZ DEFAULT now()
+
+-- audio_notes
+id UUID PK
+note_id UUID FK(notes.id)
+transcript TEXT
+created_at TIMESTAMPTZ DEFAULT now()
 ```
 
 ## API Endpoints (v0)
@@ -34,8 +40,10 @@ created_at TIMESTAMPTZ DEFAULT now()
   - Input: `multipart/form-data` with file
   - Response: `{"blocks": [{"text": string, "confidence": float, "bbox": [float]}]}`
 - `POST /asr` - Convert speech to text
-  - Input: `multipart/form-data` with file
+  - Input: `multipart/form-data` with WAV file
   - Response: `{"transcript": string}`
+  - Caches results in Redis for 1 hour
+  - Uses Whisper-small model for transcription
 - `POST /pipeline` - Process file through ML pipeline
   - Input: `multipart/form-data` with file
   - Response: `{"note_id": string}`
@@ -60,6 +68,25 @@ created_at TIMESTAMPTZ DEFAULT now()
 - ✅ Set up service dependencies and networking
 - ✅ Added health endpoints for gateway and ML services
 - ✅ Configured development environment with hot-reload
+
+### M2: FastAPI Base Implementation (2024-03-19)
+- ✅ Created FastAPI app with health check
+- ✅ Added CORS middleware
+- ✅ Defined Pydantic models for responses
+- ✅ Set up endpoint stubs for OCR, ASR, and pipeline
+
+### M2.1: OCR Implementation (2024-03-19)
+- ✅ Implemented Tesseract OCR with layout analysis
+- ✅ Added OCR block extraction and confidence scoring
+- ✅ Created test infrastructure with sample image generation
+- ✅ Added ocr_blocks table to DB schema
+
+### M2.2: ASR Implementation (2024-03-19)
+- ✅ Implemented Whisper-small model for transcription
+- ✅ Added Redis caching with SHA256 hashing
+- ✅ Created test infrastructure with sample audio generation
+- ✅ Added audio_notes table to DB schema
+- ✅ Added proper error handling for invalid audio files
 
 ### Development Environment (2024-03-19)
 - ✅ Go 1.24.3
