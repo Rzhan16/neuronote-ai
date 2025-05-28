@@ -28,6 +28,17 @@ created_at TIMESTAMPTZ
 - ✅ Added polyglot .gitignore
 - ✅ Created initial documentation
 
+### M1.1: Docker Setup (2024-03-19)
+- ✅ Created Docker Compose configuration with five services:
+  - Frontend (Node.js): Port 5173
+  - Gateway (Go): Port 8080 with healthcheck
+  - ML Service (Python): Port 8000 with healthcheck
+  - PostgreSQL: With persistent volume
+  - Redis: With persistent volume
+- ✅ Set up service dependencies and networking
+- ✅ Added health endpoints for gateway and ML services
+- ✅ Configured development environment with hot-reload
+
 ### Development Environment (2024-03-19)
 - ✅ Go 1.24.3
 - ✅ Node.js 23.11.0

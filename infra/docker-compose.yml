@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ../frontend:/app
+    command: sh -c "npm install && npm run dev -- --host"
+    ports:
+      - "5173:5173"
+    networks:
+      - neuronote
+
+  gateway:
+    image: golang:1.22-alpine
+    working_dir: /app
+    volumes:
+      - ../gateway:/app
+    command: sh -c "apk add --no-cache wget && go mod download && go run main.go"
+    ports:
+      - "8080:8080"
+    depends_on:
+      ml:
+        condition: service_healthy
+    networks:
+      - neuronote
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  ml:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ../ml:/app
+    command: sh -c "apt-get update && apt-get install -y curl && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - neuronote
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - neuronote
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    networks:
+      - neuronote
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+networks:
+  neuronote:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata: 
