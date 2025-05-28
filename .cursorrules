@@ -1,0 +1,4 @@
+# ALWAYS read neuronote-ai.md before writing or refactoring code.
+# Append a summary + schema diff to neuronote-ai.md after each major feature/migration.
+# Keep endpoint contracts in sync with docs/openapi.yaml.
+# If a TODO in neuronote-ai.md conflicts with a prompt, ask for clarification.
