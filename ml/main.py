@@ -1,12 +1,13 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from typing import List, Literal
 import wave
 import io
 import numpy as np
 from .ocr_service import extract_layout
 from .asr_service import transcribe
+from .summarise_service import summarise
 
 app = FastAPI()
 
@@ -30,6 +31,13 @@ class OCRResponse(BaseModel):
 
 class ASRResponse(BaseModel):
     transcript: str
+
+class SummaryRequest(BaseModel):
+    text: str
+    style: Literal["bullets", "paragraph"] = "paragraph"
+
+class SummaryResponse(BaseModel):
+    summary: str
 
 class PipelineResponse(BaseModel):
     note_id: str
@@ -66,6 +74,12 @@ async def asr_endpoint(file: UploadFile = File(...)) -> ASRResponse:
     
     result = transcribe(audio_array)
     return ASRResponse(transcript=result["text"])
+
+# Summarization Endpoint
+@app.post("/summarize", response_model=SummaryResponse)
+async def summarize_endpoint(request: SummaryRequest) -> SummaryResponse:
+    result = summarise(request.text, request.style)
+    return SummaryResponse(summary=result["summary"])
 
 # Pipeline Endpoint
 @app.post("/pipeline", response_model=PipelineResponse)

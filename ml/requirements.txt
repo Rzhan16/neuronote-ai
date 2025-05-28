@@ -10,4 +10,6 @@ sentencepiece==0.2.0
 protobuf==4.25.3
 transformers==4.38.2
 torch==2.2.1
-redis==5.0.3 
+redis==5.0.3
+bitsandbytes==0.42.0
+accelerate==0.28.0 

@@ -29,6 +29,15 @@ id UUID PK
 note_id UUID FK(notes.id)
 transcript TEXT
 created_at TIMESTAMPTZ DEFAULT now()
+
+-- notes
+id UUID PK
+user_id UUID FK(users.id)
+title TEXT
+content TEXT
+summary TEXT
+created_at TIMESTAMPTZ DEFAULT now()
+updated_at TIMESTAMPTZ DEFAULT now()
 ```
 
 ## API Endpoints (v0)
@@ -44,6 +53,14 @@ created_at TIMESTAMPTZ DEFAULT now()
   - Response: `{"transcript": string}`
   - Caches results in Redis for 1 hour
   - Uses Whisper-small model for transcription
+- `POST /summarize` - Generate text summary
+  - Input: `{"text": string, "style": "bullets"|"paragraph"}`
+  - Response: `{"summary": string}`
+  - Uses BART-large-CNN model
+    - Docker: 4-bit quantization (GPU)
+    - Local: FP32 precision (CPU)
+  - Supports paragraph and bullet-point formats
+  - Caches results in Redis for 1 hour
 - `POST /pipeline` - Process file through ML pipeline
   - Input: `multipart/form-data` with file
   - Response: `{"note_id": string}`
@@ -87,6 +104,15 @@ created_at TIMESTAMPTZ DEFAULT now()
 - ✅ Created test infrastructure with sample audio generation
 - ✅ Added audio_notes table to DB schema
 - ✅ Added proper error handling for invalid audio files
+
+### M2.3: Summarization Implementation (2024-03-19)
+- ✅ Implemented BART-large-CNN model
+  - Docker: 4-bit quantization (GPU)
+  - Local: FP32 precision (CPU)
+- ✅ Added support for paragraph and bullet-point formats
+- ✅ Created test infrastructure with sample text
+- ✅ Added summary column to notes table
+- ✅ Added Redis caching with style-specific keys
 
 ### Development Environment (2024-03-19)
 - ✅ Go 1.24.3
