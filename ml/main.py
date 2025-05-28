@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
+from .ocr_service import extract_layout
 
 app = FastAPI()
 
@@ -37,9 +38,11 @@ async def health_check() -> dict:
 # OCR Endpoint
 @app.post("/ocr", response_model=OCRResponse)
 async def ocr_endpoint(file: UploadFile = File(...)) -> OCRResponse:
-    # TODO: Implement OCR logic
+    contents = await file.read()
+    result = extract_layout(contents)
     return OCRResponse(blocks=[
-        Block(text="Sample text", confidence=0.95, bbox=[0, 0, 100, 100])
+        Block(text=block["text"], confidence=1.0, bbox=block["bbox"])
+        for block in result["blocks"]
     ])
 
 # ASR Endpoint

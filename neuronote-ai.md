@@ -16,6 +16,13 @@ id UUID PK
 email TEXT UNIQUE
 hashed_password TEXT
 created_at TIMESTAMPTZ
+
+-- ocr_blocks
+id UUID PK
+note_id UUID FK(notes.id)
+text TEXT
+bbox JSONB  -- [x1, y1, x2, y2]
+created_at TIMESTAMPTZ DEFAULT now()
 ```
 
 ## API Endpoints (v0)
