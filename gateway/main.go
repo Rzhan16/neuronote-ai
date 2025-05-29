@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
 	_ "github.com/lib/pq"
 )
 
@@ -48,6 +48,8 @@ type StudyBlock struct {
 	NoteID    string    `json:"note_id"`
 	Status    string    `json:"status"`
 }
+
+var db *sql.DB
 
 // Database connection
 func getDB() (*sql.DB, error) {
@@ -229,23 +231,38 @@ func getSchedule(c *fiber.Ctx) error {
 }
 
 func main() {
+	// Initialize database
+	var err error
+	db, err = sql.Open("postgres", "postgres://postgres:postgres@postgres:5432/neuronote?sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Create Fiber app
 	app := fiber.New()
 
 	// Middleware
 	app.Use(logger.New())
-	app.Use(cors.New())
-	app.Use(requestid.New())
+	app.Use(cors.New(cors.Config{
+		AllowCredentials: true,
+	}))
 
-	// Routes
+	// Public routes
 	app.Get("/health", healthCheck)
-	app.Post("/api/notes/upload", uploadNote)
-	app.Get("/api/notes/:id", getNote)
-	app.Get("/api/schedule", getSchedule)
+	app.Post("/auth/signup", signup)
+	app.Post("/auth/login", login)
+
+	// Protected routes
+	api := app.Group("/api", authMiddleware())
+	api.Post("/notes/upload", uploadNote)
+	api.Get("/notes/:id", getNote)
+	api.Get("/schedule", getSchedule)
 
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	app.Listen(":" + port)
+	log.Fatal(app.Listen(":" + port))
 }

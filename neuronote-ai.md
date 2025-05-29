@@ -59,6 +59,13 @@ start_time TIMESTAMPTZ
 end_time TIMESTAMPTZ
 status TEXT
 created_at TIMESTAMPTZ DEFAULT now()
+
+-- sessions
+id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+user_id UUID REFERENCES users(id),
+token TEXT NOT NULL,
+expires_at TIMESTAMPTZ NOT NULL,
+created_at TIMESTAMPTZ DEFAULT NOW()
 ```
 
 ## API Endpoints (v0)
@@ -168,3 +175,31 @@ created_at TIMESTAMPTZ DEFAULT now()
 - ✅ Python 3.11.12
 - ✅ Fly CLI 0.3.132 (authenticated)
 - ✅ Git (2.49.0)
+
+## Milestone 3.1: Authentication & Authorization
+
+### Features Added
+- JWT-based authentication with secure cookie storage
+- User signup and login endpoints
+- Session management with database persistence
+- Protected API routes with middleware
+- Password hashing with bcrypt
+- OpenAPI documentation updates
+
+### Schema Changes
+```sql
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id),
+    token TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Security Considerations
+- JWT tokens expire after 30 days
+- Secure, HTTP-only cookies
+- Password hashing with bcrypt
+- Session tracking for token revocation
+- CORS configured for secure cookie handling
