@@ -1,13 +1,17 @@
 import uuid
 import magic
 import psycopg2
+import os
+import json
+import numpy as np
 from typing import Dict, List, Optional
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 from keybert import KeyBERT
-from .ocr_service import extract_layout
-from .asr_service import transcribe
-from .summarise_service import summarise
-from .qg_service import generate_qa
+from pydantic import BaseModel
+from ocr_service import extract_layout
+from asr_service import transcribe
+from summarise_service import summarise
+from qg_service import generate_qa
 
 # Initialize KeyBERT model
 keybert_model = KeyBERT()

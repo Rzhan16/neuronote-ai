@@ -5,11 +5,11 @@ from typing import List, Literal
 import wave
 import io
 import numpy as np
-from .ocr_service import extract_layout
-from .asr_service import transcribe
-from .summarise_service import summarise
-from .qg_service import generate_qa
-from .pipeline import process_note
+from ocr_service import extract_layout
+from asr_service import transcribe
+from summarise_service import summarise
+from qg_service import generate_qa
+from pipeline import process_note
 
 app = FastAPI()
 

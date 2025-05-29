@@ -23,6 +23,8 @@ services:
     depends_on:
       ml:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - neuronote
     healthcheck:
@@ -36,14 +38,14 @@ services:
     working_dir: /app
     volumes:
       - ../ml:/app
-    command: sh -c "apt-get update && apt-get install -y curl && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000"
+    command: sh -c "apt-get update && apt-get install -y curl tesseract-ocr libmagic1 && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - neuronote
     healthcheck:
@@ -56,8 +58,10 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: neuronote
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - neuronote
     healthcheck:

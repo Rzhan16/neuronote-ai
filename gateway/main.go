@@ -210,7 +210,8 @@ func main() {
 	api := app.Group("/api", authMiddleware())
 	api.Post("/notes", uploadNote)
 	api.Get("/notes/:id", getNote)
-	api.Get("/schedule", getSchedule)
+	api.Post("/schedule", createSchedule)
+	api.Get("/schedule", getStudySchedule)
 
 	// Start server
 	port := os.Getenv("PORT")
