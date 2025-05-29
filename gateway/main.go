@@ -1,14 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"mime/multipart"
-	"net/http"
 	"os"
 	"time"
 
@@ -49,12 +44,10 @@ type StudyBlock struct {
 	Status    string    `json:"status"`
 }
 
-var db *sql.DB
-
-// Database connection
-func getDB() (*sql.DB, error) {
-	return sql.Open("postgres", dbConnStr)
-}
+var (
+	db       *sql.DB
+	mlClient *MLClient
+)
 
 // Handlers
 func healthCheck(c *fiber.Ctx) error {
@@ -70,16 +63,6 @@ func uploadNote(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create multipart form for ML service
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", file.Filename)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to create form",
-		})
-	}
-
 	// Open uploaded file
 	src, err := file.Open()
 	if err != nil {
@@ -89,53 +72,26 @@ func uploadNote(c *fiber.Ctx) error {
 	}
 	defer src.Close()
 
-	// Copy file to form
-	if _, err = io.Copy(part, src); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to copy file",
-		})
-	}
-	writer.Close()
+	// Get user ID from context
+	userID := c.Get("X-User-ID")
 
 	// Send to ML service
-	resp, err := http.Post(
-		fmt.Sprintf("%s/pipeline", mlBaseURL),
-		writer.FormDataContentType(),
-		body,
-	)
+	noteID, err := mlClient.Pipeline(src, file.Filename, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "ML service error",
-		})
-	}
-	defer resp.Body.Close()
-
-	// Parse response
-	var result map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to parse ML response",
+			"error": fmt.Sprintf("ML service error: %v", err),
 		})
 	}
 
-	return c.JSON(result)
+	return c.JSON(fiber.Map{"note_id": noteID})
 }
 
 func getNote(c *fiber.Ctx) error {
 	noteID := c.Params("id")
 
-	// Get database connection
-	db, err := getDB()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Database connection failed",
-		})
-	}
-	defer db.Close()
-
 	// Get note with quiz cards
 	var note Note
-	err = db.QueryRow(`
+	err := db.QueryRow(`
 		SELECT id, content, summary, created_at, updated_at
 		FROM notes
 		WHERE id = $1
@@ -186,15 +142,6 @@ func getNote(c *fiber.Ctx) error {
 }
 
 func getSchedule(c *fiber.Ctx) error {
-	// Get database connection
-	db, err := getDB()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Database connection failed",
-		})
-	}
-	defer db.Close()
-
 	// Get upcoming study blocks
 	rows, err := db.Query(`
 		SELECT id, note_id, start_time, end_time, status
@@ -231,9 +178,12 @@ func getSchedule(c *fiber.Ctx) error {
 }
 
 func main() {
-	// Initialize database
+	// Initialize ML client
+	mlClient = NewMLClient()
+
+	// Initialize database connection
 	var err error
-	db, err = sql.Open("postgres", "postgres://postgres:postgres@postgres:5432/neuronote?sslmode=disable")
+	db, err = sql.Open("postgres", dbConnStr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -242,9 +192,12 @@ func main() {
 	// Create Fiber app
 	app := fiber.New()
 
-	// Middleware
+	// Add middleware
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:3000",
+		AllowMethods:     "GET,POST,PUT,DELETE",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowCredentials: true,
 	}))
 
@@ -255,7 +208,7 @@ func main() {
 
 	// Protected routes
 	api := app.Group("/api", authMiddleware())
-	api.Post("/notes/upload", uploadNote)
+	api.Post("/notes", uploadNote)
 	api.Get("/notes/:id", getNote)
 	api.Get("/schedule", getSchedule)
 
