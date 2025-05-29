@@ -51,9 +51,33 @@ id UUID PK
 note_id UUID FK(notes.id)
 tag TEXT
 created_at TIMESTAMPTZ DEFAULT now()
+
+-- study_blocks
+id UUID PK
+note_id UUID FK(notes.id)
+start_time TIMESTAMPTZ
+end_time TIMESTAMPTZ
+status TEXT
+created_at TIMESTAMPTZ DEFAULT now()
 ```
 
 ## API Endpoints (v0)
+
+### Gateway Service (Port 8080)
+- `GET /health` - Health check endpoint
+  - Response: `{"ok": true}`
+- `POST /api/notes/upload` - Upload and process a note
+  - Input: `multipart/form-data` with file
+  - Response: `{"note_id": string}`
+  - Forwards file to ML service for processing
+  - Supports both image and audio files
+- `GET /api/notes/:id` - Get note details
+  - Response: `{"id": string, "content": string, "summary": string, "quiz_cards": [{"id": string, "question": string, "answer": string}], "created_at": string, "updated_at": string}`
+  - Returns note with generated quiz cards
+- `GET /api/schedule` - Get study schedule
+  - Response: `[{"id": string, "note_id": string, "start_time": string, "end_time": string, "status": string}]`
+  - Returns upcoming study blocks
+  - Ordered by start time
 
 ### ML Service (Port 8000)
 - `GET /health` - Health check endpoint
@@ -127,6 +151,16 @@ created_at TIMESTAMPTZ DEFAULT now()
 - ✅ Added comprehensive test suite for all components
 - ✅ Added proper error handling and validation
 - ✅ Updated database schema with all required tables
+
+### M3: Gateway API Implementation (2024-03-19) ✅
+- ✅ Created Go Fiber app with health check
+- ✅ Added middleware (Logger, CORS, RequestID)
+- ✅ Implemented note upload endpoint with ML service integration
+- ✅ Added note retrieval with quiz cards
+- ✅ Added study schedule endpoint
+- ✅ Set up PostgreSQL connection
+- ✅ Added proper error handling and validation
+- ✅ Updated API documentation
 
 ### Development Environment (2024-03-19)
 - ✅ Go 1.24.3
