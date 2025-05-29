@@ -203,3 +203,46 @@ CREATE TABLE sessions (
 - Password hashing with bcrypt
 - Session tracking for token revocation
 - CORS configured for secure cookie handling
+
+## Milestone M3.2: Study Schedule Optimization
+
+## Features
+- Added study schedule optimization using Google OR-Tools
+- Implemented Ebbinghaus forgetting curve for retention calculation
+- Created scheduler solver with constraints:
+  - Maximum 3 study sessions per note
+  - 30-minute study slots
+  - No scheduling during busy slots
+  - Maximize weighted retention probability
+- Added study_blocks table with user_id, note_id, start_time, end_time
+- Added POST /api/schedule endpoint for generating optimal schedules
+- Updated GET /api/schedule endpoint to return upcoming study blocks
+
+## Schema Changes
+```sql
+CREATE TABLE study_blocks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    note_id UUID NOT NULL REFERENCES notes(id),
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT valid_time_range CHECK (start_time < end_time)
+);
+
+CREATE INDEX study_blocks_user_id_idx ON study_blocks(user_id);
+CREATE INDEX study_blocks_note_id_idx ON study_blocks(note_id);
+CREATE INDEX study_blocks_start_time_idx ON study_blocks(start_time);
+```
+
+## API Changes
+- POST /api/schedule
+  - Input: notes (id, due_date, weight) and calendar (start, end, busy)
+  - Output: Array of study blocks with optimal scheduling
+- GET /api/schedule
+  - Updated to include user_id and timestamps
+  - Removed status field (now implicit in time range)
+
+## Dependencies
+- Added github.com/google/or-tools/go/ortools for optimization

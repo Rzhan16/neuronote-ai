@@ -62,9 +62,15 @@ CREATE TABLE IF NOT EXISTS tags (
 
 CREATE TABLE IF NOT EXISTS study_blocks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    note_id UUID REFERENCES notes(id),
-    start_time TIMESTAMPTZ,
-    end_time TIMESTAMPTZ,
-    status TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-); 
+    user_id UUID NOT NULL REFERENCES users(id),
+    note_id UUID NOT NULL REFERENCES notes(id),
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT valid_time_range CHECK (start_time < end_time)
+);
+
+CREATE INDEX IF NOT EXISTS study_blocks_user_id_idx ON study_blocks(user_id);
+CREATE INDEX IF NOT EXISTS study_blocks_note_id_idx ON study_blocks(note_id);
+CREATE INDEX IF NOT EXISTS study_blocks_start_time_idx ON study_blocks(start_time); 
