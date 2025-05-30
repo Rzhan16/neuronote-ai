@@ -34,7 +34,7 @@ export function Dashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [darkMode, setDarkMode] = useState(false);
-  const [activeSection, setActiveSection] = useState<'upload' | 'notes' | 'questions' | 'study'>('notes');
+  const [activeSection, setActiveSection] = useState<'upload' | 'notes' | 'questions' | 'study'>('upload');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   useEffect(() => {
@@ -84,12 +84,13 @@ export function Dashboard() {
     loadData();
   }, []);
 
-  const handleUploadSuccess = async () => {
+  const handleUploadSuccess = async (response: any) => {
     setIsUploading(false);
     setUploadError(null);
     setUploadProgress(100);
     await fetchNotes();
     await fetchStudyBlocks();
+    setActiveSection('notes'); // Switch to notes view after successful upload
   };
 
   if (isLoading) {
@@ -156,6 +157,7 @@ export function Dashboard() {
                 setUploadError(error.message);
               }}
               onUploadProgress={(progress) => {
+                setIsUploading(true);
                 setUploadProgress(progress);
               }}
             />
@@ -313,4 +315,4 @@ export function Dashboard() {
       </main>
     </div>
   );
-} 
+}

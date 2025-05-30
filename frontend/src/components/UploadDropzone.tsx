@@ -37,35 +37,25 @@ export function UploadDropzone({ onUploadSuccess, onUploadError, onUploadProgres
       formData.append('file', patchedFile);
 
       // Use fetch for upload
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/notes/upload', true);
-      xhr.setRequestHeader('X-User-ID', 'test-user-id');
+      const response = await fetch('/api/notes/upload', {
+        method: 'POST',
+        headers: {
+          'X-User-ID': 'test-user-id',
+        },
+        body: formData,
+      });
 
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const progress = (event.loaded / event.total) * 100;
-          onUploadProgress(progress);
-        }
-      };
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Upload failed with status ${response.status}: ${errorText}`);
+      }
 
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          const response = JSON.parse(xhr.responseText);
-          onUploadSuccess(response);
-        } else {
-          onUploadError(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
-        }
-      };
-
-      xhr.onerror = () => {
-        onUploadError(new Error('Upload failed'));
-      };
-
-      xhr.send(formData);
+      const result = await response.json();
+      onUploadSuccess(result);
     } catch (error) {
       onUploadError(error instanceof Error ? error : new Error('Upload failed'));
     }
-  }, [onUploadSuccess, onUploadError, onUploadProgress]);
+  }, [onUploadSuccess, onUploadError]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -117,4 +107,4 @@ export function UploadDropzone({ onUploadSuccess, onUploadError, onUploadProgres
   );
 }
 
-export default UploadDropzone; 
+export default UploadDropzone;
