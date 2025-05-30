@@ -1,0 +1,9 @@
+This is a test note for NeuroNote AI.
+
+The quick brown fox jumps over the lazy dog.
+
+Key points to remember:
+1. Testing file upload
+2. Testing ML pipeline
+3. Testing note retrieval
+4. Testing quiz card generation 

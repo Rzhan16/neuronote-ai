@@ -10,11 +10,85 @@ import (
 	"time"
 )
 
-const timeout = 5 * time.Second
-
+// MLClient handles communication with the ML service
 type MLClient struct {
-	client  *http.Client
-	baseURL string
+	baseURL    string
+	httpClient *http.Client
+}
+
+// NewMLClient creates a new ML service client
+func NewMLClient() *MLClient {
+	return &MLClient{
+		baseURL: mlBaseURL,
+		httpClient: &http.Client{
+			Timeout: time.Second * 300, // 5 minutes timeout for long-running ML tasks
+		},
+	}
+}
+
+// Pipeline processes a file through the ML pipeline
+func (c *MLClient) Pipeline(file io.Reader, filename string, userID string) (string, error) {
+	// Create multipart form
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add file
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to create form file: %v", err)
+	}
+
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return "", fmt.Errorf("failed to copy file: %v", err)
+	}
+
+	// Add user ID
+	err = writer.WriteField("user_id", userID)
+	if err != nil {
+		return "", fmt.Errorf("failed to write user_id field: %v", err)
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return "", fmt.Errorf("failed to close writer: %v", err)
+	}
+
+	// Create request
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/pipeline", c.baseURL), body)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Send request
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ML service error: %s", string(respBody))
+	}
+
+	// Parse response
+	var result struct {
+		NoteID string `json:"note_id"`
+	}
+	err = json.Unmarshal(respBody, &result)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return result.NoteID, nil
 }
 
 type Block struct {
@@ -33,24 +107,6 @@ type ASRResponse struct {
 
 type PipelineResponse struct {
 	NoteID string `json:"note_id"`
-}
-
-func NewMLClient() *MLClient {
-	return &MLClient{
-		client: &http.Client{
-			Timeout: timeout,
-		},
-		baseURL: "http://ml:8000",
-	}
-}
-
-func (c *MLClient) Pipeline(file io.Reader, filename string, userID string) (string, error) {
-	var response PipelineResponse
-	err := c.sendFileRequest("/pipeline", file, filename, userID, &response)
-	if err != nil {
-		return "", fmt.Errorf("pipeline request failed: %w", err)
-	}
-	return response.NoteID, nil
 }
 
 func (c *MLClient) OCR(file io.Reader, filename string, userID string) ([]Block, error) {
@@ -105,7 +161,7 @@ func (c *MLClient) sendFileRequest(endpoint string, file io.Reader, filename str
 	}
 
 	// Send request
-	resp, err := c.client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}

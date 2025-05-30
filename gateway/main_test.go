@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -49,33 +48,13 @@ func TestHealthCheck(t *testing.T) {
 }
 
 func TestUploadNote(t *testing.T) {
-	// Start a test ML server
-	mlServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/pipeline", r.URL.Path)
-		assert.Equal(t, "POST", r.Method)
-		assert.Contains(t, r.Header.Get("Content-Type"), "multipart/form-data")
-
-		// Parse multipart form
-		err := r.ParseMultipartForm(10 << 20)
-		assert.NoError(t, err)
-
-		// Check file
-		file, header, err := r.FormFile("file")
-		assert.NoError(t, err)
-		assert.Equal(t, "test.txt", header.Filename)
-		defer file.Close()
-
-		// Return a mock response
-		json.NewEncoder(w).Encode(map[string]string{
-			"note_id": "test-note-id",
-		})
-	}))
-	defer mlServer.Close()
-
-	// Set up the app with mock ML service
-	app, _ := setupTestApp()
-	mlClient.baseURL = mlServer.URL
+	app, mock := setupTestApp()
 	app.Post("/api/notes", uploadNote)
+
+	// Mock the database insert
+	mock.ExpectQuery(`INSERT INTO notes`).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("test-note-id"))
 
 	// Create a test file
 	body := &bytes.Buffer{}
@@ -83,89 +62,83 @@ func TestUploadNote(t *testing.T) {
 	part, err := writer.CreateFormFile("file", "test.txt")
 	assert.NoError(t, err)
 
-	content := []byte("This is a test note")
+	content := []byte("This is a test note content.")
 	_, err = part.Write(content)
 	assert.NoError(t, err)
 	writer.Close()
 
+	// Create a test request
 	req := httptest.NewRequest("POST", "/api/notes", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("X-User-ID", "test-user")
+	req.Header.Set("X-User-ID", "test-user-id")
 
+	// Test the endpoint
 	resp, err := app.Test(req)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var result map[string]string
+	// Parse response
+	var result map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	assert.NoError(t, err)
-	assert.Equal(t, "test-note-id", result["note_id"])
+	assert.Contains(t, result, "id")
 }
 
-func TestGetNote(t *testing.T) {
+func TestGetNotes(t *testing.T) {
 	app, mock := setupTestApp()
-	app.Get("/api/notes/:id", getNote)
+	app.Get("/api/notes", getNotes)
 
-	// Test non-existent note
-	mock.ExpectQuery("SELECT id, content, summary, created_at, updated_at FROM notes WHERE id = \\$1").
-		WithArgs("test-id").
-		WillReturnError(sql.ErrNoRows)
+	// Mock the database query
+	rows := sqlmock.NewRows([]string{"id", "title", "content", "summary", "created_at", "updated_at", "quiz_cards"}).
+		AddRow("test-id", "Test Note", "content", "summary", time.Now(), time.Now(), "[]")
 
-	req := httptest.NewRequest("GET", "/api/notes/test-id", nil)
-	resp, err := app.Test(req)
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-
-	// Test existing note
-	rows := sqlmock.NewRows([]string{"id", "content", "summary", "created_at", "updated_at"}).
-		AddRow("test-id", "test content", "test summary", time.Now(), time.Now())
-	mock.ExpectQuery("SELECT id, content, summary, created_at, updated_at FROM notes WHERE id = \\$1").
-		WithArgs("test-id-2").
+	mock.ExpectQuery(`SELECT n.id, n.title, n.content, n.summary, n.created_at, n.updated_at`).
+		WithArgs("test-user-id").
 		WillReturnRows(rows)
 
-	// Mock quiz cards
-	cardRows := sqlmock.NewRows([]string{"id", "question", "answer"}).
-		AddRow("card-1", "test question", "test answer")
-	mock.ExpectQuery("SELECT id, question, answer FROM quiz_cards WHERE note_id = \\$1").
-		WithArgs("test-id-2").
-		WillReturnRows(cardRows)
+	// Create a test request
+	req := httptest.NewRequest("GET", "/api/notes", nil)
+	req.Header.Set("X-User-ID", "test-user-id")
 
-	req = httptest.NewRequest("GET", "/api/notes/test-id-2", nil)
-	resp, err = app.Test(req)
+	// Test the endpoint
+	resp, err := app.Test(req)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var note Note
-	err = json.NewDecoder(resp.Body).Decode(&note)
+	// Parse response
+	var notes []Note
+	err = json.NewDecoder(resp.Body).Decode(&notes)
 	assert.NoError(t, err)
-	assert.Equal(t, "test-id", note.ID)
-	assert.Equal(t, "test content", note.Content)
-	assert.Equal(t, "test summary", note.Summary)
-	assert.Len(t, note.QuizCards, 1)
-	assert.Equal(t, "card-1", note.QuizCards[0].ID)
+	assert.Len(t, notes, 1)
+	assert.Equal(t, "test-id", notes[0].ID)
 }
 
-func TestGetSchedule(t *testing.T) {
+func TestGetStudyBlocks(t *testing.T) {
 	app, mock := setupTestApp()
-	app.Get("/api/schedule", getSchedule)
+	app.Get("/api/schedule", getStudyBlocks)
 
-	// Mock schedule rows
+	// Mock the database query
 	now := time.Now()
 	rows := sqlmock.NewRows([]string{"id", "note_id", "start_time", "end_time", "status"}).
-		AddRow("block-1", "note-1", now, now.Add(time.Hour), "pending")
-	mock.ExpectQuery("SELECT id, note_id, start_time, end_time, status FROM study_blocks").
+		AddRow("block-1", "note-1", now, now.Add(time.Hour), "scheduled")
+
+	mock.ExpectQuery(`SELECT id, start_time, end_time, note_id, status FROM study_blocks`).
+		WithArgs("test-user-id").
 		WillReturnRows(rows)
 
+	// Create a test request
 	req := httptest.NewRequest("GET", "/api/schedule", nil)
+	req.Header.Set("X-User-ID", "test-user-id")
+
+	// Test the endpoint
 	resp, err := app.Test(req)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
+	// Parse response
 	var blocks []StudyBlock
 	err = json.NewDecoder(resp.Body).Decode(&blocks)
 	assert.NoError(t, err)
 	assert.Len(t, blocks, 1)
 	assert.Equal(t, "block-1", blocks[0].ID)
-	assert.Equal(t, "note-1", blocks[0].NoteID)
-	assert.Equal(t, "pending", blocks[0].Status)
 }

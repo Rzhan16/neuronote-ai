@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - gateway
+
+  gateway:
+    image: golang:1.21-alpine
+    working_dir: /app
+    command: sh -c "go mod download && go mod tidy && go run main.go"
+    ports:
+      - "8080:8080"
+    environment:
+      - ML_SERVICE_URL=http://ml:8000
+      - POSTGRES_URL=postgres://neuronote:neuronote@postgres:5432/neuronote?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-secret-key
+    volumes:
+      - ./gateway:/app
+    depends_on:
+      - postgres
+      - redis
+      - ml
+
+  ml:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MODEL_CACHE_DIR=/app/model_cache
+    volumes:
+      - ml_model_cache:/app/model_cache
+    depends_on:
+      - redis
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=neuronote
+      - POSTGRES_PASSWORD=neuronote
+      - POSTGRES_DB=neuronote
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./gateway/migrations:/docker-entrypoint-initdb.d
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+  ml_model_cache: 

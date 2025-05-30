@@ -1,9 +1,10 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Body
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Literal
+from typing import List, Literal, Optional
 import wave
 import io
+import uuid
 import numpy as np
 from ocr_service import extract_layout
 from asr_service import transcribe
@@ -102,11 +103,43 @@ async def generate_qa_endpoint(request: QARequest) -> QAResponse:
 
 # Pipeline Endpoint
 @app.post("/pipeline", response_model=PipelineResponse)
-async def pipeline_endpoint(file: UploadFile = File(...)) -> PipelineResponse:
+async def pipeline_endpoint(
+    file: UploadFile = File(...),
+    user_id: str = Form(default="anonymous")
+) -> PipelineResponse:
     try:
-        result = await process_note(file)
-        return PipelineResponse(**result)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Validate file type
+        content_type = file.content_type
+        if not any(t in content_type.lower() for t in ["pdf", "text", "image", "audio"]):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {content_type}. Supported types: PDF, text, images, audio."
+            )
+
+        # Read file content
+        content = await file.read()
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="Empty file uploaded"
+            )
+
+        # Process the file
+        try:
+            result = await process_note(file)
+            if not result or "note_id" not in result:
+                raise ValueError("Processing failed to return a valid note ID")
+            return PipelineResponse(**result)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to process file: {str(e)}"
+            )
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
