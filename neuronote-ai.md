@@ -2,12 +2,12 @@
 
 Multimodal note-summariser & adaptive study-planner.
 
-| Layer | Tech                     |
-|-------|--------------------------|
-| FE    | React + Vite + Tailwind  |
-| API   | Go (Fiber)               |
-| ML    | FastAPI + Hugging Face   |
-| Data  | Postgres, Redis          |
+| Layer | Tech                               |
+|-------|------------------------------------|
+| FE    | React + Vite + TS + Tailwind + shadcn/ui |
+| API   | Go (Fiber)                         |
+| ML    | FastAPI + Hugging Face             |
+| Data  | Postgres, Redis                    |
 
 ## DB schema (v0)
 ```sql
@@ -246,3 +246,5 @@ CREATE INDEX study_blocks_start_time_idx ON study_blocks(start_time);
 
 ## Dependencies
 - Added github.com/google/or-tools/go/ortools for optimization
+
+
