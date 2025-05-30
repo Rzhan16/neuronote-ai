@@ -133,7 +133,7 @@ export function Dashboard() {
         return (
           <Card title="Upload New Note" className="max-w-2xl mx-auto">
             {uploadError && (
-              <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md" data-testid="upload-error">
+              <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md\" data-testid="upload-error">
                 {uploadError}
               </div>
             )}
