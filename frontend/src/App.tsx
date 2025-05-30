@@ -1,9 +1,9 @@
-import { Dashboard } from '@/pages/Dashboard';
+import { Dashboard } from './pages/Dashboard'
 
-export default function App() {
+function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Dashboard />
-    </div>
-  );
+    <Dashboard />
+  )
 }
+
+export default App

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import ICAL from 'ical.js';
+// import ICAL from 'ical.js';
 import { get, set } from 'idb-keyval';
 
 interface CalendarEvent {
@@ -34,13 +34,13 @@ async function fetchGoogleCalendar(token: string): Promise<CalendarEvent[]> {
     },
   });
 
-  return response.data.items.map((event: any) => ({
-    id: event.id,
-    title: event.summary,
-    start: new Date(event.start.dateTime || event.start.date),
-    end: new Date(event.end.dateTime || event.end.date),
+  return response.data.items.map((event: Record<string, unknown>) => ({
+    id: event.id as string,
+    title: event.summary as string,
+    start: new Date((event.start as { dateTime?: string; date?: string }).dateTime || (event.start as { dateTime?: string; date?: string }).date as string),
+    end: new Date((event.end as { dateTime?: string; date?: string }).dateTime || (event.end as { dateTime?: string; date?: string }).date as string),
     calendar: 'google' as const,
-    busy: event.transparency !== 'transparent',
+    busy: (event.transparency as string) !== 'transparent',
   }));
 }
 
@@ -56,43 +56,14 @@ async function fetchOutlookCalendar(token: string): Promise<CalendarEvent[]> {
     },
   });
 
-  return response.data.value.map((event: any) => ({
-    id: event.Id,
-    title: event.Subject,
-    start: new Date(event.Start.DateTime),
-    end: new Date(event.End.DateTime),
+  return response.data.value.map((event: Record<string, unknown>) => ({
+    id: event.Id as string,
+    title: event.Subject as string,
+    start: new Date((event.Start as { DateTime: string }).DateTime),
+    end: new Date((event.End as { DateTime: string }).DateTime),
     calendar: 'outlook' as const,
-    busy: event.ShowAs === 'Busy',
+    busy: (event.ShowAs as string) === 'Busy',
   }));
-}
-
-async function fetchCalDAVCalendar(url: string, username: string, password: string): Promise<CalendarEvent[]> {
-  const response = await axios.get(url, {
-    auth: {
-      username,
-      password,
-    },
-    headers: {
-      'Content-Type': 'text/calendar',
-    },
-  });
-
-  const jcalData = ICAL.parse(response.data);
-  const comp = new ICAL.Component(jcalData);
-  const vevents = comp.getAllSubcomponents('vevent');
-
-  return vevents.map((vevent) => {
-    const event = new ICAL.Event(vevent);
-    return {
-      id: event.uid,
-      title: event.summary,
-      start: event.startDate.toJSDate(),
-      end: event.endDate.toJSDate(),
-      calendar: 'outlook' as const, // or determine from URL
-      busy: !event.component.getFirstPropertyValue('transp') || 
-            event.component.getFirstPropertyValue('transp') !== 'TRANSPARENT',
-    };
-  });
 }
 
 export function useCalendar() {
@@ -111,10 +82,10 @@ export function useCalendar() {
         const { events, timestamp } = cached;
         if (Date.now() - timestamp < CACHE_DURATION) {
           setState({
-            events: events.map((e: any) => ({
+            events: events.map((e: Record<string, unknown>) => ({
               ...e,
-              start: new Date(e.start),
-              end: new Date(e.end),
+              start: new Date(e.start as string),
+              end: new Date(e.end as string),
             })),
             loading: false,
             error: null,

@@ -1,97 +1,76 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { cn } from '@/lib/utils'; // Assuming shadcn/ui setup @/lib/utils
-export function UploadDropzone({ onUploadSuccess, onUploadError }) {
-    const [isUploading, setIsUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [error, setError] = useState(null);
+import { cn } from '@/lib/utils';
+export function UploadDropzone({ onUploadSuccess, onUploadError, onUploadProgress }) {
     const onDrop = useCallback(async (acceptedFiles) => {
-        if (acceptedFiles.length === 0) {
-            return;
-        }
-        const file = acceptedFiles[0];
-        setIsUploading(true);
-        setError(null);
-        setUploadProgress(0);
-        const formData = new FormData();
-        formData.append('file', file);
         try {
+            const file = acceptedFiles[0];
+            if (!file)
+                return;
+            // Block empty files
+            if (file.size === 0) {
+                onUploadError(new Error('File is empty. Please select a non-empty file.'));
+                return;
+            }
+            // Patch the file type if missing or incorrect
+            let patchedFile = file;
+            if (!file.type || file.type === 'application/octet-stream') {
+                let type = '';
+                if (file.name.endsWith('.pdf'))
+                    type = 'application/pdf';
+                else if (file.name.endsWith('.txt'))
+                    type = 'text/plain';
+                else if (file.name.endsWith('.png'))
+                    type = 'image/png';
+                else if (file.name.endsWith('.jpg') || file.name.endsWith('.jpeg'))
+                    type = 'image/jpeg';
+                if (type) {
+                    patchedFile = new File([file], file.name, { type });
+                }
+            }
+            const formData = new FormData();
+            formData.append('file', patchedFile);
+            // Use fetch for upload
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/notes/upload', true);
-            // Cookies should be sent automatically by the browser if the API is on the same domain
-            // or if CORS is configured correctly on the server to allow credentials.
+            xhr.setRequestHeader('X-User-ID', 'test-user-id');
             xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) {
-                    const percentComplete = Math.round((event.loaded * 100) / event.total);
-                    setUploadProgress(percentComplete);
+                    const progress = (event.loaded / event.total) * 100;
+                    onUploadProgress(progress);
                 }
             };
             xhr.onload = () => {
-                setIsUploading(false);
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const responseJson = JSON.parse(xhr.responseText);
-                        if (onUploadSuccess) {
-                            onUploadSuccess(responseJson);
-                        }
-                    }
-                    catch (e) {
-                        console.error('Failed to parse upload response:', e);
-                        setError('Upload succeeded but failed to parse server response.');
-                        if (onUploadError) {
-                            onUploadError(new Error('Failed to parse server response.'));
-                        }
-                    }
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    onUploadSuccess(response);
                 }
                 else {
-                    let errorMessage = `Upload failed with status: ${xhr.status}`;
-                    try {
-                        const errorResponse = JSON.parse(xhr.responseText);
-                        errorMessage = errorResponse.error || errorResponse.message || errorMessage;
-                    }
-                    catch (e) {
-                        // Keep default error message
-                    }
-                    setError(errorMessage);
-                    if (onUploadError) {
-                        onUploadError(new Error(errorMessage));
-                    }
+                    onUploadError(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
                 }
             };
             xhr.onerror = () => {
-                setIsUploading(false);
-                setError('Upload failed due to a network error.');
-                if (onUploadError) {
-                    onUploadError(new Error('Network error during upload.'));
-                }
+                onUploadError(new Error('Upload failed'));
             };
             xhr.send(formData);
         }
-        catch (err) {
-            setIsUploading(false);
-            let message = 'An unknown error occurred during upload.';
-            if (err instanceof Error) {
-                message = err.message;
-            }
-            setError(message);
-            console.error('Upload error:', err);
-            if (onUploadError) {
-                onUploadError(err);
-            }
+        catch (error) {
+            onUploadError(error instanceof Error ? error : new Error('Upload failed'));
         }
-    }, [onUploadSuccess, onUploadError]);
-    const { getRootProps, getInputProps, isDragActive, isDragAccept, isDragReject } = useDropzone({
+    }, [onUploadSuccess, onUploadError, onUploadProgress]);
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: {
-            'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
-            'audio/*': ['.mp3', '.wav', '.ogg', '.m4a'],
             'application/pdf': ['.pdf'],
+            'image/png': ['.png'],
+            'image/jpeg': ['.jpg', '.jpeg'],
+            'text/plain': ['.txt'],
         },
-        multiple: false,
+        maxFiles: 1,
     });
-    return (_jsxs("div", { ...getRootProps({
-            className: cn('p-10 border-2 border-dashed rounded-lg text-center cursor-pointer', 'transition-colors duration-200 ease-in-out', isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400', isDragAccept ? 'border-green-500 bg-green-50' : '', isDragReject ? 'border-red-500 bg-red-50' : '', isUploading ? 'bg-gray-100 cursor-not-allowed' : ''),
-        }), children: [_jsx("input", { ...getInputProps(), disabled: isUploading }), isUploading ? (_jsxs("div", { className: "flex flex-col items-center", children: [_jsx("p", { className: "mb-2 text-lg font-semibold", children: "Uploading..." }), _jsx("div", { className: "w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700", children: _jsx("div", { className: "bg-blue-600 h-2.5 rounded-full transition-all duration-150", style: { width: `${uploadProgress}%` } }) }), _jsxs("p", { className: "mt-1 text-sm text-gray-600", children: [uploadProgress, "%"] })] })) : isDragActive ? (_jsxs("p", { className: "text-blue-600 font-semibold", children: [isDragAccept && 'Drop the file here!', isDragReject && 'File type not accepted', !isDragAccept && !isDragReject && 'Release to drop the file'] })) : (_jsxs("p", { className: "text-gray-500", children: ["Drag & drop a file here, or click to select a file", _jsx("br", {}), _jsx("span", { className: "text-xs text-gray-400", children: "(Images, Audio, PDF)" })] })), error && (_jsxs("p", { className: "mt-4 text-sm text-red-600 bg-red-100 p-2 rounded", children: ["Error: ", error] }))] }));
+    return (_jsxs("div", { ...getRootProps(), className: cn('border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors', isDragActive
+            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+            : 'border-gray-300 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500'), children: [_jsx("input", { ...getInputProps() }), _jsxs("div", { className: "space-y-4", children: [_jsx("div", { className: "mx-auto h-12 w-12 text-gray-400", children: _jsx("svg", { className: "h-full w-full", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: _jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" }) }) }), _jsxs("div", { className: "text-gray-600 dark:text-gray-400", children: [_jsx("p", { className: "text-base font-medium", children: isDragActive ? 'Drop your file here' : 'Drag & drop your file here' }), _jsx("p", { className: "text-sm mt-1", children: "or click to browse" }), _jsx("p", { className: "text-xs mt-2", children: "Supports PDF, images, and text files" })] })] })] }));
 }
 export default UploadDropzone;
